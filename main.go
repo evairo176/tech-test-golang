@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -77,80 +78,51 @@ func initDB() {
 	}
 }
 
-// ==================== TASK 1: GetCountry/{Name} ====================
+// ==================== TASK 1: GetCountry/:name ====================
 
-func getCountryHandler(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+func getCountryHandler(c echo.Context) error {
+	name := c.Param("name")
 	if name == "" {
-		// Fallback for Go < 1.22 style or manual extraction
-		// Try extracting from URL path
-		path := r.URL.Path
-		prefix := "/GetCountry/"
-		if len(path) > len(prefix) {
-			name = path[len(prefix):]
-		}
-	}
-
-	if name == "" {
-		http.Error(w, "Name parameter is required", http.StatusBadRequest)
-		return
+		return c.String(http.StatusBadRequest, "Name parameter is required")
 	}
 
 	var country string
 	err := db.QueryRow("SELECT Country FROM Person WHERE Name = ?", name).Scan(&country)
 	if err == sql.ErrNoRows {
-		http.Error(w, fmt.Sprintf("Person '%s' not found", name), http.StatusNotFound)
-		return
+		return c.String(http.StatusNotFound, fmt.Sprintf("Person '%s' not found", name))
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
+		return c.String(http.StatusInternalServerError, "Database error")
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(country))
+	return c.String(http.StatusOK, country)
 }
 
-// ==================== TASK 2: GetCurrentTime/{Timezone} ====================
+// ==================== TASK 2: GetCurrentTime/:timezone ====================
 
-func getCurrentTimeHandler(w http.ResponseWriter, r *http.Request) {
-	timezone := r.PathValue("timezone")
+func getCurrentTimeHandler(c echo.Context) error {
+	timezone := c.Param("timezone")
 	if timezone == "" {
-		path := r.URL.Path
-		prefix := "/GetCurrentTime/"
-		if len(path) > len(prefix) {
-			timezone = path[len(prefix):]
-		}
-	}
-
-	if timezone == "" {
-		http.Error(w, "Timezone parameter is required", http.StatusBadRequest)
-		return
+		return c.String(http.StatusBadRequest, "Timezone parameter is required")
 	}
 
 	// Consume timeapi.io
 	url := fmt.Sprintf("https://timeapi.io/api/time/current/zone?timeZone=%s", timezone)
 	resp, err := http.Get(url)
 	if err != nil {
-		http.Error(w, "Failed to call time API", http.StatusBadGateway)
-		return
+		return c.String(http.StatusBadGateway, "Failed to call time API")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, fmt.Sprintf("Time API returned status %d", resp.StatusCode), resp.StatusCode)
-		return
+		return c.String(resp.StatusCode, fmt.Sprintf("Time API returned status %d", resp.StatusCode))
 	}
 
 	var timeResp TimeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&timeResp); err != nil {
-		http.Error(w, "Failed to parse time API response", http.StatusInternalServerError)
-		return
+		return c.String(http.StatusInternalServerError, "Failed to parse time API response")
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(timeResp)
+	return c.JSON(http.StatusOK, timeResp)
 }
 
 // ==================== MAIN ====================
@@ -164,28 +136,21 @@ func main() {
 		port = "8080"
 	}
 
-	mux := http.NewServeMux()
+	e := echo.New()
 
 	// Task 1 routes
-	mux.HandleFunc("/GetCountry/{name}", getCountryHandler)
-	mux.HandleFunc("/GetCountry/", getCountryHandler)
+	e.GET("/GetCountry/:name", getCountryHandler)
 
 	// Task 2 routes
-	mux.HandleFunc("/GetCurrentTime/{timezone}", getCurrentTimeHandler)
-	mux.HandleFunc("/GetCurrentTime/", getCurrentTimeHandler)
+	e.GET("/GetCurrentTime/:timezone", getCurrentTimeHandler)
 
 	// Root endpoint
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"endpoints": "GetCountry/{name}, GetCurrentTime/{timezone}",
+	e.GET("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"endpoints": "GetCountry/:name, GetCurrentTime/:timezone",
 		})
 	})
 
 	log.Printf("Server starting on :%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	e.Logger.Fatal(e.Start(":" + port))
 }

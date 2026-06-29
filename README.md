@@ -1,6 +1,12 @@
 # Tech Test - Golang (3 Jam)
 
-Technical test dengan 2 task Web API menggunakan Golang + SQLite.
+Technical test dengan 2 task Web API menggunakan **Golang + Echo Framework + SQLite**.
+
+## Tech Stack
+
+- **Language:** Go 1.22+
+- **Framework:** Echo v4
+- **Database:** SQLite (go-sqlite3)
 
 ## Task 1: Web API (SQL)
 
@@ -14,14 +20,14 @@ CRUD Person table + endpoint GetCountry by name.
 | Dominic | Thailand |
 
 **Endpoint:**
-- `GET /GetCountry/{name}` → Returns country string
+- `GET /GetCountry/:name` → Returns country string
 
 ## Task 2: Web API (Integration)
 
 Consume timeapi.io untuk mendapatkan current time by timezone.
 
 **Endpoint:**
-- `GET /GetCurrentTime/{timezone}` → Returns JSON time response
+- `GET /GetCurrentTime/:timezone` → Returns JSON time response
 
 ## Cara Run
 
@@ -41,6 +47,6 @@ curl http://localhost:8080/GetCountry/Adam
 # Output: Kuala Lumpur
 
 # Task 2
-curl http://localhost:8090/GetCurrentTime/Europe%2FAmsterdam
+curl http://localhost:8080/GetCurrentTime/Europe%2FAmsterdam
 # Output: JSON { year, month, day, hour, minute, seconds, ... }
 ```
