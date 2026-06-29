@@ -7,6 +7,36 @@ Technical test dengan 2 task Web API menggunakan **Golang + Echo Framework + SQL
 - **Language:** Go 1.22+
 - **Framework:** Echo v4
 - **Database:** SQLite (go-sqlite3)
+- **Migration:** golang-migrate/migrate
+
+---
+
+## Project Structure
+
+```
+tech-test-golang/
+├── cmd/
+│   └── server/
+│       └── main.go              # Entry point
+├── config/
+│   └── config.go                # Config, DB init, migrations & seeders
+├── database/
+│   └── migrations/
+│       ├── 000001_create_person_table.up.sql
+│       └── 000001_create_person_table.down.sql
+├── internal/
+│   ├── handler/
+│   │   └── handler.go           # HTTP handlers (controller layer)
+│   ├── model/
+│   │   └── model.go             # Data models (Person, TimeResponse)
+│   ├── repository/
+│   │   └── person_repository.go # Database queries (repository layer)
+│   └── response/
+│       └── response.go          # Standard API response helper
+├── go.mod
+├── go.sum
+└── README.md
+```
 
 ---
 
@@ -23,21 +53,16 @@ CRUD Person table + endpoint GetCountry by name.
 | Henry   | Singapore     |
 | Dominic | Thailand      |
 
-### SQL Scripts
+### Migrations
 
-File SQL tersedia di folder `sql/` untuk dijalankan manual:
+Migration files berada di `database/migrations/`. Dijalankan otomatis saat server start.
 
-```bash
-sqlite3 persons.db < sql/01_create_table.sql
-sqlite3 persons.db < sql/02_insert_data.sql
-sqlite3 persons.db < sql/03_select_and_stored_procedure.sql
-```
+- `000001_create_person_table.up.sql` — Create table
+- `000001_create_person_table.down.sql` — Drop table (rollback)
 
-| File | Deskripsi |
-|------|-----------|
-| `sql/01_create_table.sql` | Create table script |
-| `sql/02_insert_data.sql` | Insert data script (4 data awal) |
-| `sql/03_select_and_stored_procedure.sql` | Select by name + stored procedure equivalent (PostgreSQL, MySQL, SQL Server) |
+### Seeders
+
+Seeder dijalankan otomatis saat server start jika tabel Person kosong. Menginsert 4 data awal (Adam, John, Henry, Dominic).
 
 ### API Endpoints
 
@@ -205,10 +230,10 @@ GET /GetCurrentTime/{timezone}
 
 ```bash
 # Langsung run
-go run main.go
+go run ./cmd/server
 
 # Atau build dulu
-go build -o tech-test . && ./tech-test
+go build -o tech-test ./cmd/server && ./tech-test
 ```
 
 Server berjalan di `http://localhost:8080` (default), atau set via env:
