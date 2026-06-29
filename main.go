@@ -114,8 +114,55 @@ func initDB() {
 	}
 }
 
-// ==================== TASK 1: GetCountry/:name ====================
+// ==================== TASK 1: Person CRUD ====================
 
+// POST /person — Insert new person
+func createPersonHandler(c echo.Context) error {
+	p := new(Person)
+	if err := c.Bind(p); err != nil {
+		return ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
+	}
+	if p.Name == "" || p.Country == "" {
+		return ErrorResponse(c, http.StatusBadRequest, "Name and Country are required")
+	}
+
+	result, err := db.Exec("INSERT INTO Person (Name, Country) VALUES (?, ?)", p.Name, p.Country)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return ErrorResponse(c, http.StatusConflict, fmt.Sprintf("Person '%s' already exists", p.Name))
+		}
+		return ErrorResponse(c, http.StatusInternalServerError, "Failed to insert person")
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	return SuccessResponse(c, http.StatusCreated, "Person created successfully", map[string]interface{}{
+		"name":         p.Name,
+		"country":      p.Country,
+		"rowsAffected": rowsAffected,
+	})
+}
+
+// GET /persons — Select all persons
+func getAllPersonsHandler(c echo.Context) error {
+	rows, err := db.Query("SELECT Name, Country FROM Person ORDER BY Name")
+	if err != nil {
+		return ErrorResponse(c, http.StatusInternalServerError, "Failed to query persons")
+	}
+	defer rows.Close()
+
+	persons := []Person{}
+	for rows.Next() {
+		var p Person
+		if err := rows.Scan(&p.Name, &p.Country); err != nil {
+			return ErrorResponse(c, http.StatusInternalServerError, "Failed to scan person")
+		}
+		persons = append(persons, p)
+	}
+
+	return SuccessResponse(c, http.StatusOK, fmt.Sprintf("Found %d persons", len(persons)), persons)
+}
+
+// GET /getcountry/:name — Get country by person name
 func getCountryHandler(c echo.Context) error {
 	name := c.Param("name")
 	if name == "" {
@@ -136,6 +183,26 @@ func getCountryHandler(c echo.Context) error {
 	})
 }
 
+// DELETE /person/:name — Delete person by name
+func deletePersonHandler(c echo.Context) error {
+	name := c.Param("name")
+	if name == "" {
+		return ErrorResponse(c, http.StatusBadRequest, "Name parameter is required")
+	}
+
+	result, err := db.Exec("DELETE FROM Person WHERE LOWER(Name) = LOWER(?)", name)
+	if err != nil {
+		return ErrorResponse(c, http.StatusInternalServerError, "Failed to delete person")
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Person '%s' not found", name))
+	}
+
+	return SuccessResponse(c, http.StatusOK, fmt.Sprintf("Person '%s' deleted", name), nil)
+}
+
 // ==================== TASK 2: GetCurrentTime/:timezone ====================
 
 func getCurrentTimeHandler(c echo.Context) error {
@@ -144,7 +211,6 @@ func getCurrentTimeHandler(c echo.Context) error {
 		return ErrorResponse(c, http.StatusBadRequest, "Timezone parameter is required")
 	}
 
-	// Decode URL-encoded timezone (e.g. Europe%2FAmsterdam -> Europe/Amsterdam)
 	decoded, err := url.QueryUnescape(timezone)
 	if err != nil {
 		return ErrorResponse(c, http.StatusBadRequest, "Invalid timezone format")
@@ -184,13 +250,23 @@ func main() {
 	e := echo.New()
 	e.Pre(CaseInsensitiveRouting)
 
+	// Task 1 — Person CRUD
+	e.POST("/person", createPersonHandler)
+	e.GET("/persons", getAllPersonsHandler)
 	e.GET("/getcountry/:name", getCountryHandler)
+	e.DELETE("/person/:name", deletePersonHandler)
+
+	// Task 2 — Time API
 	e.GET("/getcurrenttime/:timezone", getCurrentTimeHandler)
 
+	// Root
 	e.GET("/", func(c echo.Context) error {
 		return SuccessResponse(c, http.StatusOK, "Tech Test Golang API", map[string]interface{}{
 			"endpoints": []map[string]string{
+				{"method": "POST", "path": "/person", "description": "Create a new person (body: {name, country})"},
+				{"method": "GET", "path": "/persons", "description": "Get all persons"},
 				{"method": "GET", "path": "/GetCountry/{name}", "description": "Get country by person name"},
+				{"method": "DELETE", "path": "/person/{name}", "description": "Delete person by name"},
 				{"method": "GET", "path": "/GetCurrentTime/{timezone}", "description": "Get current time by timezone"},
 			},
 		})
