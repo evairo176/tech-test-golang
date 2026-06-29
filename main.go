@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -36,15 +37,37 @@ type TimeResponse struct {
 	DstActive    bool   `json:"dstActive"`
 }
 
+// ==================== STANDARD API RESPONSE ====================
+
+type APIResponse struct {
+	Status  string      `json:"status"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+func SuccessResponse(c echo.Context, code int, message string, data interface{}) error {
+	return c.JSON(code, APIResponse{
+		Status:  "success",
+		Code:    code,
+		Message: message,
+		Data:    data,
+	})
+}
+
+func ErrorResponse(c echo.Context, code int, message string) error {
+	return c.JSON(code, APIResponse{
+		Status:  "error",
+		Code:    code,
+		Message: message,
+	})
+}
+
 // ==================== MIDDLEWARE ====================
 
-// CaseInsensitiveRouting normalizes URL path to lowercase before routing
 func CaseInsensitiveRouting(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// Normalize the path but keep the param values as-is for lookup
 		path := c.Request().URL.Path
-		// Split path into segments, lowercase only the route parts
-		// We'll lowercase the whole path so routes match case-insensitively
 		c.Request().URL.Path = strings.ToLower(path)
 		return next(c)
 	}
@@ -61,7 +84,6 @@ func initDB() {
 		log.Fatal(err)
 	}
 
-	// Create table
 	createTableSQL := `
 	CREATE TABLE IF NOT EXISTS Person (
 		Name    TEXT PRIMARY KEY,
@@ -72,7 +94,6 @@ func initDB() {
 		log.Fatal(err)
 	}
 
-	// Insert data (only if empty)
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM Person").Scan(&count)
 	if err != nil {
@@ -98,19 +119,21 @@ func initDB() {
 func getCountryHandler(c echo.Context) error {
 	name := c.Param("name")
 	if name == "" {
-		return c.String(http.StatusBadRequest, "Name parameter is required")
+		return ErrorResponse(c, http.StatusBadRequest, "Name parameter is required")
 	}
 
-	// Case-insensitive name lookup: query with LOWER comparison
 	var country string
 	err := db.QueryRow("SELECT Country FROM Person WHERE LOWER(Name) = LOWER(?)", name).Scan(&country)
 	if err == sql.ErrNoRows {
-		return c.String(http.StatusNotFound, fmt.Sprintf("Person '%s' not found", name))
+		return ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Person '%s' not found", name))
 	} else if err != nil {
-		return c.String(http.StatusInternalServerError, "Database error")
+		return ErrorResponse(c, http.StatusInternalServerError, "Database error")
 	}
 
-	return c.String(http.StatusOK, country)
+	return SuccessResponse(c, http.StatusOK, fmt.Sprintf("Country for '%s' found", name), map[string]string{
+		"name":    name,
+		"country": country,
+	})
 }
 
 // ==================== TASK 2: GetCurrentTime/:timezone ====================
@@ -118,27 +141,33 @@ func getCountryHandler(c echo.Context) error {
 func getCurrentTimeHandler(c echo.Context) error {
 	timezone := c.Param("timezone")
 	if timezone == "" {
-		return c.String(http.StatusBadRequest, "Timezone parameter is required")
+		return ErrorResponse(c, http.StatusBadRequest, "Timezone parameter is required")
 	}
 
-	// Consume timeapi.io
-	url := fmt.Sprintf("https://timeapi.io/api/time/current/zone?timeZone=%s", timezone)
-	resp, err := http.Get(url)
+	// Decode URL-encoded timezone (e.g. Europe%2FAmsterdam -> Europe/Amsterdam)
+	decoded, err := url.QueryUnescape(timezone)
 	if err != nil {
-		return c.String(http.StatusBadGateway, "Failed to call time API")
+		return ErrorResponse(c, http.StatusBadRequest, "Invalid timezone format")
+	}
+	timezone = decoded
+
+	requestURL := fmt.Sprintf("https://timeapi.io/api/time/current/zone?timeZone=%s", url.QueryEscape(timezone))
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return ErrorResponse(c, http.StatusBadGateway, "Failed to call time API")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return c.String(resp.StatusCode, fmt.Sprintf("Time API returned status %d", resp.StatusCode))
+		return ErrorResponse(c, resp.StatusCode, fmt.Sprintf("Time API returned status %d", resp.StatusCode))
 	}
 
 	var timeResp TimeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&timeResp); err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to parse time API response")
+		return ErrorResponse(c, http.StatusInternalServerError, "Failed to parse time API response")
 	}
 
-	return c.JSON(http.StatusOK, timeResp)
+	return SuccessResponse(c, http.StatusOK, fmt.Sprintf("Current time for '%s'", timezone), timeResp)
 }
 
 // ==================== MAIN ====================
@@ -153,20 +182,17 @@ func main() {
 	}
 
 	e := echo.New()
-
-	// Case-insensitive routing middleware
 	e.Pre(CaseInsensitiveRouting)
 
-	// Task 1 routes
 	e.GET("/getcountry/:name", getCountryHandler)
-
-	// Task 2 routes
 	e.GET("/getcurrenttime/:timezone", getCurrentTimeHandler)
 
-	// Root endpoint
 	e.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{
-			"endpoints": "GetCountry/{name}, GetCurrentTime/{timezone}",
+		return SuccessResponse(c, http.StatusOK, "Tech Test Golang API", map[string]interface{}{
+			"endpoints": []map[string]string{
+				{"method": "GET", "path": "/GetCountry/{name}", "description": "Get country by person name"},
+				{"method": "GET", "path": "/GetCurrentTime/{timezone}", "description": "Get current time by timezone"},
+			},
 		})
 	})
 
