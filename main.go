@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
@@ -33,6 +34,20 @@ type TimeResponse struct {
 	TimeZone     string `json:"timeZone"`
 	DayOfWeek    string `json:"dayOfWeek"`
 	DstActive    bool   `json:"dstActive"`
+}
+
+// ==================== MIDDLEWARE ====================
+
+// CaseInsensitiveRouting normalizes URL path to lowercase before routing
+func CaseInsensitiveRouting(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		// Normalize the path but keep the param values as-is for lookup
+		path := c.Request().URL.Path
+		// Split path into segments, lowercase only the route parts
+		// We'll lowercase the whole path so routes match case-insensitively
+		c.Request().URL.Path = strings.ToLower(path)
+		return next(c)
+	}
 }
 
 // ==================== DATABASE ====================
@@ -86,8 +101,9 @@ func getCountryHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Name parameter is required")
 	}
 
+	// Case-insensitive name lookup: query with LOWER comparison
 	var country string
-	err := db.QueryRow("SELECT Country FROM Person WHERE Name = ?", name).Scan(&country)
+	err := db.QueryRow("SELECT Country FROM Person WHERE LOWER(Name) = LOWER(?)", name).Scan(&country)
 	if err == sql.ErrNoRows {
 		return c.String(http.StatusNotFound, fmt.Sprintf("Person '%s' not found", name))
 	} else if err != nil {
@@ -138,16 +154,19 @@ func main() {
 
 	e := echo.New()
 
+	// Case-insensitive routing middleware
+	e.Pre(CaseInsensitiveRouting)
+
 	// Task 1 routes
-	e.GET("/GetCountry/:name", getCountryHandler)
+	e.GET("/getcountry/:name", getCountryHandler)
 
 	// Task 2 routes
-	e.GET("/GetCurrentTime/:timezone", getCurrentTimeHandler)
+	e.GET("/getcurrenttime/:timezone", getCurrentTimeHandler)
 
 	// Root endpoint
 	e.GET("/", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{
-			"endpoints": "GetCountry/:name, GetCurrentTime/:timezone",
+			"endpoints": "GetCountry/{name}, GetCurrentTime/{timezone}",
 		})
 	})
 
