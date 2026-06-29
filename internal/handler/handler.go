@@ -99,11 +99,11 @@ func (h *PersonHandler) DeletePerson(c echo.Context) error {
 func RootHandler(c echo.Context) error {
 	return response.Success(c, http.StatusOK, "Tech Test Golang API", map[string]interface{}{
 		"endpoints": []map[string]string{
-			{"method": "POST", "path": "/person", "description": "Create a new person (body: {name, country})"},
-			{"method": "GET", "path": "/persons", "description": "Get all persons"},
-			{"method": "GET", "path": "/GetCountry/{name}", "description": "Get country by person name"},
-			{"method": "DELETE", "path": "/person/{name}", "description": "Delete person by name"},
-			{"method": "GET", "path": "/GetCurrentTime/{timezone}", "description": "Get current time by timezone"},
+			{"method": "POST", "path": "/api/person", "description": "Create a new person (body: {name, country})"},
+			{"method": "GET", "path": "/api/persons", "description": "Get all persons"},
+			{"method": "GET", "path": "/api/GetCountry/{name}", "description": "Get country by person name"},
+			{"method": "DELETE", "path": "/api/person/{name}", "description": "Delete person by name"},
+			{"method": "GET", "path": "/api/GetCurrentTime/{timezone}", "description": "Get current time by timezone"},
 		},
 	})
 }

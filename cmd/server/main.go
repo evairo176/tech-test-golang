@@ -36,14 +36,17 @@ func main() {
 		}
 	})
 
+	// API group
+	api := e.Group("/api")
+
 	// Task 1 — Person CRUD
-	e.POST("/person", personHandler.CreatePerson)
-	e.GET("/persons", personHandler.GetAllPersons)
-	e.GET("/getcountry/:name", personHandler.GetCountryByName)
-	e.DELETE("/person/:name", personHandler.DeletePerson)
+	api.POST("/person", personHandler.CreatePerson)
+	api.GET("/persons", personHandler.GetAllPersons)
+	api.GET("/getcountry/:name", personHandler.GetCountryByName)
+	api.DELETE("/person/:name", personHandler.DeletePerson)
 
 	// Task 2 — Time API
-	e.GET("/getcurrenttime/:timezone", handler.GetCurrentTime)
+	api.GET("/getcurrenttime/:timezone", handler.GetCurrentTime)
 
 	// Root endpoint
 	e.GET("/", func(c echo.Context) error {

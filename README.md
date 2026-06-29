@@ -71,7 +71,7 @@ Seeder dijalankan otomatis saat server start jika tabel Person kosong. Menginser
 Select semua data person dari database.
 
 ```
-GET /persons
+GET /api/persons
 ```
 
 **Response:**
@@ -94,10 +94,10 @@ GET /persons
 Cari country berdasarkan nama person. Case-insensitive.
 
 ```
-GET /GetCountry/{name}
+GET /api/GetCountry/{name}
 ```
 
-**Contoh:** `GET /GetCountry/Adam`
+**Contoh:** `GET /api/GetCountry/Adam`
 
 **Response:**
 ```json
@@ -126,7 +126,7 @@ GET /GetCountry/{name}
 Insert data person baru ke database.
 
 ```
-POST /person
+POST /api/person
 Content-Type: application/json
 ```
 
@@ -166,10 +166,10 @@ Content-Type: application/json
 Hapus data person berdasarkan nama. Case-insensitive.
 
 ```
-DELETE /person/{name}
+DELETE /api/person/{name}
 ```
 
-**Contoh:** `DELETE /person/Budi`
+**Contoh:** `DELETE /api/person/Budi`
 
 **Response:**
 ```json
@@ -187,10 +187,10 @@ DELETE /person/{name}
 Consume timeapi.io untuk mendapatkan current time by timezone.
 
 ```
-GET /GetCurrentTime/{timezone}
+GET /api/GetCurrentTime/{timezone}
 ```
 
-**Contoh:** `GET /GetCurrentTime/Europe/Amsterdam`
+**Contoh:** `GET /api/GetCurrentTime/Europe/Amsterdam`
 
 > ⚠️ Timezone yang mengandung `/` perlu di-URL-encode menjadi `%2F`.
 > Contoh: `Europe/Amsterdam` → `Europe%2FAmsterdam`
@@ -248,19 +248,19 @@ PORT=3000 ./tech-test
 
 ```bash
 # Select all persons
-curl http://localhost:8080/persons
+curl http://localhost:8080/api/persons
 
 # Get country by name
-curl http://localhost:8080/GetCountry/Adam
+curl http://localhost:8080/api/GetCountry/Adam
 
 # Create new person
-curl -X POST http://localhost:8080/person \
+curl -X POST http://localhost:8080/api/person \
   -H "Content-Type: application/json" \
   -d '{"name":"Budi","country":"Indonesia"}'
 
 # Delete person
-curl -X DELETE http://localhost:8080/person/Budi
+curl -X DELETE http://localhost:8080/api/person/Budi
 
 # Get current time
-curl http://localhost:8080/GetCurrentTime/Asia%2FJakarta
+curl http://localhost:8080/api/GetCurrentTime/Asia%2FJakarta
 ```
